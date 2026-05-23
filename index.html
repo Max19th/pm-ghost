@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Polymarket Ghost Scanner v2</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0a0e1a;
+    color: #e6edf3;
+    padding: 16px;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(at 0% 0%, rgba(80, 100, 200, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(160, 80, 200, 0.1) 0px, transparent 50%);
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px 0;
+    background: linear-gradient(90deg, #7dd3fc, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+  .card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    backdrop-filter: blur(10px);
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #e6edf3;
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #7dd3fc; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  button {
+    width: 100%;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    color: white;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 14px;
+    font-family: inherit;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.5; }
+  .hint { font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4; }
+  .results { margin-top: 8px; }
+  .outcome-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    gap: 10px;
+  }
+  .outcome-name { font-size: 16px; font-weight: 700; flex: 1; }
+  .verdict {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .verdict.ok { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+  .verdict.bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+  .verdict.warn { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .stat {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .stat-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; }
+  .stat-value { font-size: 16px; font-weight: 700; margin-top: 2px; font-family: 'SF Mono', Menlo, monospace; }
+  .stat-value.big { font-size: 20px; }
+  .stat-value.ok { color: #4ade80; }
+  .stat-value.bad { color: #f87171; }
+  .order-row {
+    display: grid;
+    grid-template-columns: 50px 1fr auto;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 6px;
+    margin-bottom: 3px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+  }
+  .order-row.bid { border-left: 2px solid #22c55e; }
+  .order-row.ask { border-left: 2px solid #ef4444; }
+  .order-row.ghost {
+    background: rgba(234, 179, 8, 0.15);
+    border-left: 2px solid #facc15;
+  }
+  .ghost-section {
+    background: rgba(234, 179, 8, 0.08);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+  .ghost-header { color: #facc15; font-weight: 700; margin-bottom: 8px; font-size: 14px; }
+  .clean { color: #4ade80; font-size: 13px; }
+  .error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .loader {
+    text-align: center;
+    padding: 20px;
+    color: #94a3b8;
+    font-size: 13px;
+  }
+  .market-card { border-left: 3px solid #6366f1; }
+  details {
+    margin-top: 8px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: #94a3b8;
+    user-select: none;
+  }
+  details[open] summary { margin-bottom: 8px; }
+  .event-title {
+    font-size: 13px;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .event-meta {
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(99, 102, 241, 0.2);
+    border-radius: 999px;
+    font-size: 10px;
+    color: #a5b4fc;
+    margin: 0 3px;
+    font-weight: 600;
+  }
+  .pill.resolved { background: rgba(248, 113, 113, 0.2); color: #fca5a5; }
+  .proxy-status {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 6px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+
+<h1>👻 Polymarket Ghost Scanner</h1>
+<div class="sub">v2 · events + multi-proxy fallback</div>
+
+<div class="card">
+  <label>Market URL · Slug · Token ID · Event URL</label>
+  <input type="text" id="input"
+         placeholder="paste anything from polymarket.com" />
+  <div class="hint">Works with: /event/... pages, /sports/... pages, raw slugs, or 20+ digit token IDs.</div>
+
+  <div class="row">
+    <div>
+      <label>Your price</label>
+      <input type="number" id="price" value="0.50" step="0.001" min="0" max="1" />
+    </div>
+    <div>
+      <label>Max spread</label>
+      <input type="number" id="maxSpread" value="0.02" step="0.005" min="0" max="0.5" />
+    </div>
+    <div>
+      <label>Min size</label>
+      <input type="number" id="minSize" value="250" step="50" min="0" />
+    </div>
+  </div>
+
+  <button id="scanBtn" onclick="scan()">🔍 Scan Market</button>
+  <div id="proxyStatus" class="proxy-status"></div>
+</div>
+
+<div id="output" class="results"></div>
+
+<script>
+const CLOB = "https://clob.polymarket.com";
+const GAMMA = "https://gamma-api.polymarket.com";
+
+// More proxies = more chance of success
+const PROXIES = [
+  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  (u) => `https://cors.eu.org/${u}`,
+  (u) => `https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+function setStatus(msg) {
+  document.getElementById('proxyStatus').textContent = msg;
+}
+
+async function smartFetch(url, attemptLog) {
+  // Try direct first
+  try {
+    const r = await fetch(url);
+    if (r.ok) {
+      const data = await r.json();
+      attemptLog.push(`✓ direct: ${url.slice(0, 50)}...`);
+      return data;
+    }
+  } catch (e) { /* CORS blocked, fall through */ }
+
+  // Cycle proxies
+  let lastErr = null;
+  for (let i = 0; i < PROXIES.length; i++) {
+    const proxify = PROXIES[i];
+    const proxyUrl = proxify(url);
+    try {
+      const r = await fetch(proxyUrl);
+      if (!r.ok) {
+        lastErr = new Error(`proxy ${i + 1} returned ${r.status}`);
+        continue;
+      }
+      const text = await r.text();
+      try {
+        const data = JSON.parse(text);
+        attemptLog.push(`✓ proxy ${i + 1}`);
+        return data;
+      } catch (e) {
+        lastErr = new Error(`proxy ${i + 1} returned non-JSON (${text.slice(0, 60)})`);
+      }
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('all proxies failed');
+}
+
+function parseInput(raw) {
+  const s = raw.trim();
+  if (!s) return null;
+  if (/^\d{20,}$/.test(s)) return { type: 'token', value: s };
+  if (s.includes('polymarket.com')) {
+    const parts = s.split('/').filter(Boolean);
+    const last = parts[parts.length - 1].split('?')[0];
+    return { type: 'slug', value: last };
+  }
+  return { type: 'slug', value: s };
+}
+
+async function resolveSlug(slug, attemptLog) {
+  setStatus(`Trying /markets endpoint...`);
+  try {
+    const data = await smartFetch(`${GAMMA}/markets?slug=${encodeURIComponent(slug)}`, attemptLog);
+    if (Array.isArray(data) && data.length > 0) {
+      return { kind: 'market', markets: [data[0]] };
+    }
+  } catch (e) { attemptLog.push(`✗ /markets: ${e.message}`); }
+
+  setStatus(`Trying /events endpoint...`);
+  try {
+    const data = await smartFetch(`${GAMMA}/events?slug=${encodeURIComponent(slug)}`, attemptLog);
+    if (Array.isArray(data) && data.length > 0) {
+      const event = data[0];
+      return { kind: 'event', event, markets: event.markets || [] };
+    }
+  } catch (e) { attemptLog.push(`✗ /events: ${e.message}`); }
+
+  throw new Error(`No market or event found for slug "${slug}". Check the slug or paste a token ID directly.`);
+}
+
+async function fetchBook(tokenId, attemptLog) {
+  return smartFetch(`${CLOB}/book?token_id=${tokenId}`, attemptLog);
+}
+
+function analyzeBook(book, minSize, yourPrice, maxSpread) {
+  const bids = (book.bids || []).map(b => ({ p: +b.price, s: +b.size })).sort((a, b) => b.p - a.p);
+  const asks = (book.asks || []).map(a => ({ p: +a.price, s: +a.size })).sort((a, b) => a.p - b.p);
+  const qBids = bids.filter(o => o.s >= minSize);
+  const qAsks = asks.filter(o => o.s >= minSize);
+  const bestBid = qBids[0]?.p ?? null;
+  const bestAsk = qAsks[0]?.p ?? null;
+  let midpoint = null, spread = null, distance = null, verdict = 'warn';
+  if (bestBid != null && bestAsk != null) {
+    midpoint = (bestBid + bestAsk) / 2;
+    spread = bestAsk - bestBid;
+    distance = Math.abs(yourPrice - midpoint);
+    verdict = distance <= maxSpread ? 'ok' : 'bad';
+  }
+  const ghostBids = bids.filter(o => o.s >= minSize && (o.p < 0.40 || o.p > 0.60));
+  const ghostAsks = asks.filter(o => o.s >= minSize && (o.p < 0.40 || o.p > 0.60));
+  return { bids, asks, qBids, qAsks, bestBid, bestAsk, midpoint, spread, distance, verdict, ghostBids, ghostAsks };
+}
+
+function renderOutcome(name, tokenId, analysis, yourPrice, maxSpread) {
+  const { bestBid, bestAsk, midpoint, distance, verdict, qBids, qAsks, ghostBids, ghostAsks } = analysis;
+  const verdictText = verdict === 'ok' ? '✅ EARNING' : verdict === 'bad' ? '❌ TOO FAR' : '⚠️ INCOMPLETE';
+  const fmt = (v, d = 4) => v == null ? '—' : (+v).toFixed(d);
+
+  let html = `<div class="outcome-header">
+      <div>
+        <div class="outcome-name">${name}</div>
+        <div class="hint">${tokenId.slice(0, 18)}...</div>
+      </div>
+      <div class="verdict ${verdict}">${verdictText}</div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Adj Midpoint</div>
+        <div class="stat-value big">${fmt(midpoint)}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Your distance</div>
+        <div class="stat-value big ${verdict === 'ok' ? 'ok' : verdict === 'bad' ? 'bad' : ''}">${distance == null ? '—' : '±' + fmt(distance)}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Best bid</div>
+        <div class="stat-value">${fmt(bestBid)}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Best ask</div>
+        <div class="stat-value">${fmt(bestAsk)}</div>
+      </div>
+    </div>`;
+
+  const totalGhosts = ghostBids.length + ghostAsks.length;
+  if (totalGhosts > 0) {
+    html += `<div class="ghost-section">
+      <div class="ghost-header">👻 ${totalGhosts} ghost order${totalGhosts > 1 ? 's' : ''}</div>
+      <div class="hint" style="margin-bottom:8px;">Qualifying orders outside 40–60¢ distorting midpoint.</div>`;
+    [...ghostBids.map(o => ({ ...o, side: 'BID' })), ...ghostAsks.map(o => ({ ...o, side: 'ASK' }))]
+      .sort((a, b) => a.p - b.p)
+      .forEach(o => {
+        html += `<div class="order-row ghost"><span>${o.side}</span><span>@ ${o.p.toFixed(4)}</span><span>${o.s.toLocaleString()}</span></div>`;
+      });
+    html += `</div>`;
+  } else if (verdict !== 'warn') {
+    html += `<div class="ghost-section"><div class="clean">✨ No ghost orders — book is clean.</div></div>`;
+  }
+
+  html += `<details><summary>Show book (${qAsks.length} asks · ${qBids.length} bids)</summary>`;
+  qAsks.slice(0, 6).reverse().forEach(o => {
+    html += `<div class="order-row ask"><span>ASK</span><span>@ ${o.p.toFixed(4)}</span><span>${o.s.toLocaleString()}</span></div>`;
+  });
+  qBids.slice(0, 6).forEach(o => {
+    html += `<div class="order-row bid"><span>BID</span><span>@ ${o.p.toFixed(4)}</span><span>${o.s.toLocaleString()}</span></div>`;
+  });
+  html += `</details>`;
+  return html;
+}
+
+async function analyzeMarket(market, yourPrice, maxSpread, minSize, attemptLog) {
+  let tokenIds = market.clobTokenIds || '[]';
+  if (typeof tokenIds === 'string') tokenIds = JSON.parse(tokenIds);
+  let outcomes = market.outcomes || '[]';
+  if (typeof outcomes === 'string') outcomes = JSON.parse(outcomes);
+
+  let html = `<div class="card market-card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px;">${market.question || market.groupItemTitle || 'Market'}</div>`;
+
+  for (let i = 0; i < tokenIds.length; i++) {
+    try {
+      const book = await fetchBook(tokenIds[i], attemptLog);
+      const analysis = analyzeBook(book, minSize, yourPrice, maxSpread);
+      html += renderOutcome(outcomes[i] || `Outcome ${i + 1}`, tokenIds[i], analysis, yourPrice, maxSpread);
+    } catch (e) {
+      html += `<div class="error">Failed to fetch ${outcomes[i] || `outcome ${i + 1}`}: ${e.message}</div>`;
+    }
+  }
+  html += `</div>`;
+  return html;
+}
+
+async function scan() {
+  const out = document.getElementById('output');
+  const btn = document.getElementById('scanBtn');
+  const raw = document.getElementById('input').value;
+  const yourPrice = +document.getElementById('price').value;
+  const maxSpread = +document.getElementById('maxSpread').value;
+  const minSize = +document.getElementById('minSize').value;
+
+  const parsed = parseInput(raw);
+  if (!parsed) {
+    out.innerHTML = `<div class="error">Paste a URL, slug, or token ID first.</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning...';
+  out.innerHTML = `<div class="loader">Resolving...</div>`;
+  setStatus('');
+  const attemptLog = [];
+
+  try {
+    let html = '';
+
+    if (parsed.type === 'token') {
+      setStatus('Fetching book...');
+      const book = await fetchBook(parsed.value, attemptLog);
+      const analysis = analyzeBook(book, minSize, yourPrice, maxSpread);
+      html = `<div class="card">${renderOutcome('Token', parsed.value, analysis, yourPrice, maxSpread)}</div>`;
+    } else {
+      const resolved = await resolveSlug(parsed.value, attemptLog);
+
+      if (resolved.kind === 'event') {
+        const e = resolved.event;
+        html += `<div class="card event-meta">
+          <div class="event-title">📅 ${e.title || 'Event'}</div>
+          <span class="pill">EVENT</span>
+          <span class="pill">${resolved.markets.length} markets</span>
+          ${e.closed ? '<span class="pill resolved">RESOLVED</span>' : ''}
+        </div>`;
+      }
+
+      setStatus(`Scanning ${resolved.markets.length} market(s)...`);
+      for (const m of resolved.markets) {
+        html += await analyzeMarket(m, yourPrice, maxSpread, minSize, attemptLog);
+      }
+    }
+
+    out.innerHTML = html;
+    setStatus(attemptLog.slice(-3).join(' · '));
+  } catch (err) {
+    out.innerHTML = `<div class="error">
+      <b>Scan failed:</b> ${err.message}<br><br>
+      <b>Debug log:</b><br>${attemptLog.map(a => '· ' + a).join('<br>') || '(no attempts logged)'}
+    </div>`;
+    setStatus('');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Scan Market';
+  }
+}
+
+document.getElementById('input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') scan();
+});
+</script>
+
+</body>
+</html>
