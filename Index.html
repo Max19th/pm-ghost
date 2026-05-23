@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Polymarket Liquidity Farmer</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0a0e1a;
+    color: #e6edf3;
+    padding: 16px;
+    padding-bottom: 60px;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(at 0% 0%, rgba(80, 100, 200, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(160, 80, 200, 0.1) 0px, transparent 50%);
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px 0;
+    background: linear-gradient(90deg, #7dd3fc, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
+  .card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    backdrop-filter: blur(10px);
+  }
+  label {
+    display: block;
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input[type="text"] {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #e6edf3;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #7dd3fc; }
+  .hint { font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4; }
+  .results { margin-top: 8px; }
+
+  .event-banner {
+    text-align: center;
+    padding: 10px 12px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .event-title { font-size: 13px; color: #c7d2fe; font-weight: 600; }
+
+  .market-card {
+    border-left: 3px solid #6366f1;
+  }
+  .market-question {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #e2e8f0;
+  }
+
+  .side-card {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 10px;
+  }
+  .side-card.favored {
+    border-color: rgba(34, 197, 94, 0.4);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.7));
+  }
+  .side-card.underdog { opacity: 0.85; }
+  .side-card.no-rewards { opacity: 0.5; }
+
+  .side-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+  .side-name { font-size: 15px; font-weight: 700; flex: 1; }
+  .side-name .crown { font-size: 13px; margin-right: 4px; }
+  .last-price {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .verdict {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .verdict.ok { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+  .verdict.bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+  .verdict.warn { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+  .verdict.info { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+  .verdict.none { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+
+  .target-price-box {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+    border: 1px solid rgba(125, 211, 252, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .target-info { flex: 1; }
+  .target-label {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .target-price {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: #7dd3fc;
+    line-height: 1;
+  }
+  .target-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 4px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+  .copy-btn {
+    background: rgba(125, 211, 252, 0.15);
+    border: 1px solid rgba(125, 211, 252, 0.3);
+    color: #7dd3fc;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .copy-btn:active { background: rgba(125, 211, 252, 0.3); }
+  .copy-btn.copied { background: rgba(34, 197, 94, 0.2); color: #4ade80; border-color: rgba(34, 197, 94, 0.4); }
+
+  .quick-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .qstat {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .qstat-label { font-size: 9px; color: #94a3b8; text-transform: uppercase; }
+  .qstat-value {
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 1px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .warning {
+    background: rgba(234, 179, 8, 0.1);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    color: #facc15;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .ghost-warn {
+    background: rgba(234, 179, 8, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .ghost-warn-header { color: #facc15; font-weight: 700; margin-bottom: 4px; }
+
+  details {
+    margin-top: 8px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 11px;
+    color: #94a3b8;
+    user-select: none;
+  }
+  details[open] summary { margin-bottom: 6px; }
+  .order-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+  }
+  .order-row.bid { border-left: 2px solid #22c55e; background: rgba(34, 197, 94, 0.05); }
+  .order-row.ask { border-left: 2px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+  .order-row.ghost { background: rgba(234, 179, 8, 0.1); border-left: 2px solid #facc15; }
+
+  .error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .loader {
+    text-align: center;
+    padding: 20px;
+    color: #94a3b8;
+    font-size: 13px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(125, 211, 252, 0.2);
+    border-top-color: #7dd3fc;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .refresh-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 10px;
+    padding: 0 4px;
+  }
+  .refresh-btn {
+    background: rgba(125, 211, 252, 0.1);
+    border: 1px solid rgba(125, 211, 252, 0.2);
+    color: #7dd3fc;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .summary-card {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.5));
+    border-color: rgba(34, 197, 94, 0.2);
+  }
+  .summary-line {
+    font-size: 12px;
+    color: #cbd5e1;
+    margin-top: 4px;
+  }
+  .summary-line b { color: #4ade80; font-family: 'SF Mono', Menlo, monospace; }
+</style>
+</head>
+<body>
+
+<h1>🌾 Polymarket Liquidity Farmer</h1>
+<div class="sub">v3 · paste a market link → get your farming target instantly</div>
+
+<div class="card">
+  <label>Market / Event URL or Slug or Token ID</label>
+  <input type="text" id="input" placeholder="paste anything from polymarket.com..." autocomplete="off" />
+  <div class="refresh-bar">
+    <span id="status">Waiting for input...</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="scan(true)" style="display:none;">↻ Refresh</button>
+  </div>
+</div>
+
+<div id="output" class="results"></div>
+
+<script>
+const CLOB = "https://clob.polymarket.com";
+const GAMMA = "https://gamma-api.polymarket.com";
+const PROXIES = [
+  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  (u) => `https://cors.eu.org/${u}`,
+  (u) => `https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+let lastInput = '';
+let debounceTimer = null;
+let currentMarketData = null; // for refresh
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+async function smartFetch(url) {
+  try {
+    const r = await fetch(url);
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const r = await fetch(PROXIES[i](url));
+      if (!r.ok) continue;
+      const text = await r.text();
+      try { return JSON.parse(text); } catch (e) { continue; }
+    } catch (e) {}
+  }
+  throw new Error('all proxies failed');
+}
+
+function parseInput(raw) {
+  const s = raw.trim();
+  if (!s) return null;
+  if (/^\d{20,}$/.test(s)) return { type: 'token', value: s };
+  if (s.includes('polymarket.com')) {
+    const parts = s.split('/').filter(Boolean);
+    const last = parts[parts.length - 1].split('?')[0];
+    return { type: 'slug', value: last };
+  }
+  return { type: 'slug', value: s };
+}
+
+async function resolveSlug(slug) {
+  // try market first
+  try {
+    const data = await smartFetch(`${GAMMA}/markets?slug=${encodeURIComponent(slug)}`);
+    if (Array.isArray(data) && data.length > 0) return { kind: 'market', markets: [data[0]] };
+  } catch (e) {}
+  // then event
+  try {
+    const data = await smartFetch(`${GAMMA}/events?slug=${encodeURIComponent(slug)}`);
+    if (Array.isArray(data) && data.length > 0) {
+      const e = data[0];
+      return { kind: 'event', event: e, markets: e.markets || [] };
+    }
+  } catch (e) {}
+  throw new Error(`Nothing found for "${slug}".`);
+}
+
+async function fetchBook(tokenId) {
+  return smartFetch(`${CLOB}/book?token_id=${tokenId}`);
+}
+
+function analyzeBook(book, minSize) {
+  const bids = (book.bids || []).map(b => ({ p: +b.price, s: +b.size })).sort((a, b) => b.p - a.p);
+  const asks = (book.asks || []).map(a => ({ p: +a.price, s: +a.size })).sort((a, b) => a.p - b.p);
+  const qBids = bids.filter(o => o.s >= minSize);
+  const qAsks = asks.filter(o => o.s >= minSize);
+  const bestBid = qBids[0]?.p ?? null;
+  const bestAsk = qAsks[0]?.p ?? null;
+  let midpoint = null, innerSpread = null;
+  if (bestBid != null && bestAsk != null) {
+    midpoint = (bestBid + bestAsk) / 2;
+    innerSpread = bestAsk - bestBid;
+  } else if (bestBid != null) {
+    midpoint = bestBid;
+  } else if (bestAsk != null) {
+    midpoint = bestAsk;
+  }
+  return { bids, asks, qBids, qAsks, bestBid, bestAsk, midpoint, innerSpread };
+}
+
+function findGhosts(analysis, midpoint, maxSpread) {
+  // Ghosts = qualifying orders WAY outside the reward zone (likely distorting midpoint)
+  if (midpoint == null) return [];
+  const farThreshold = Math.max(maxSpread * 5, 0.10); // 5x max spread or 10¢, whichever is bigger
+  const ghosts = [];
+  for (const b of analysis.qBids) {
+    if (Math.abs(b.p - midpoint) > farThreshold) ghosts.push({ ...b, side: 'BID' });
+  }
+  for (const a of analysis.qAsks) {
+    if (Math.abs(a.p - midpoint) > farThreshold) ghosts.push({ ...a, side: 'ASK' });
+  }
+  return ghosts;
+}
+
+function fmt(v, d = 4) { return v == null ? '—' : (+v).toFixed(d); }
+function fmtPct(v, d = 1) { return v == null ? '—' : (+v * 100).toFixed(d) + '¢'; }
+
+function renderSide({ name, isFavored, lastPrice, tokenId, analysis, rewardsMaxSpread, rewardsMinSize, hasRewards }) {
+  const { midpoint, bestBid, bestAsk, qBids, qAsks } = analysis;
+  const cls = !hasRewards ? 'no-rewards' : (isFavored ? 'favored' : 'underdog');
+
+  let verdict, verdictClass;
+  let twoSidedRequired = false;
+
+  if (!hasRewards) {
+    verdict = 'NO REWARDS';
+    verdictClass = 'none';
+  } else if (midpoint == null) {
+    verdict = 'EMPTY BOOK';
+    verdictClass = 'warn';
+  } else {
+    if (midpoint < 0.10 || midpoint > 0.90) {
+      twoSidedRequired = true;
+      verdict = 'TWO-SIDED ONLY';
+      verdictClass = 'warn';
+    } else {
+      verdict = 'READY TO FARM';
+      verdictClass = 'ok';
+    }
+  }
+
+  // Round midpoint to nearest 0.001 (Polymarket tick)
+  const targetPrice = midpoint != null ? Math.round(midpoint * 1000) / 1000 : null;
+
+  let html = `<div class="side-card ${cls}">
+    <div class="side-header">
+      <div class="side-name">
+        ${isFavored ? '<span class="crown">👑</span>' : ''}${name}
+      </div>
+      <div class="last-price">last ${fmtPct(lastPrice)}</div>
+      <div class="verdict ${verdictClass}">${verdict}</div>
+    </div>`;
+
+  if (hasRewards && midpoint != null) {
+    html += `<div class="target-price-box">
+      <div class="target-info">
+        <div class="target-label">📍 Place limit @</div>
+        <div class="target-price">${fmtPct(targetPrice, 1)}</div>
+        <div class="target-meta">midpoint ${fmt(midpoint)} · best bid/ask ${fmt(bestBid)} / ${fmt(bestAsk)}</div>
+      </div>
+      <button class="copy-btn" onclick="copyPrice(this, '${fmtPct(targetPrice, 1).replace('¢','')}')">Copy</button>
+    </div>
+
+    <div class="quick-stats">
+      <div class="qstat">
+        <div class="qstat-label">Min size</div>
+        <div class="qstat-value">${rewardsMinSize.toLocaleString()}</div>
+      </div>
+      <div class="qstat">
+        <div class="qstat-label">Max spread</div>
+        <div class="qstat-value">±${(rewardsMaxSpread * 100).toFixed(1)}¢</div>
+      </div>
+      <div class="qstat">
+        <div class="qstat-label">Side</div>
+        <div class="qstat-value">${isFavored ? 'FAV' : 'DOG'}</div>
+      </div>
+    </div>`;
+
+    if (twoSidedRequired) {
+      html += `<div class="warning">
+        ⚠️ Midpoint is in extreme zone — single-sided orders won't score. You must place orders on <b>both</b> sides (this one + the opposite outcome).
+      </div>`;
+    }
+
+    // Ghost orders relevant to farming
+    const ghosts = findGhosts(analysis, midpoint, rewardsMaxSpread);
+    if (ghosts.length > 0) {
+      html += `<div class="ghost-warn">
+        <div class="ghost-warn-header">👻 ${ghosts.length} ghost order${ghosts.length > 1 ? 's' : ''} could shift midpoint</div>`;
+      ghosts.slice(0, 6).sort((a, b) => a.p - b.p).forEach(o => {
+        html += `<div class="order-row ghost"><span>${o.side}</span><span>@ ${fmtPct(o.p)}</span><span>${o.s.toLocaleString()}</span></div>`;
+      });
+      if (ghosts.length > 6) html += `<div class="hint">+ ${ghosts.length - 6} more</div>`;
+      html += `</div>`;
+    }
+  } else if (!hasRewards) {
+    html += `<div class="hint">This market has no LP rewards configured.</div>`;
+  } else {
+    html += `<div class="hint">Order book too thin to compute midpoint.</div>`;
+  }
+
+  html += `<details><summary>Show book (${qAsks.length} asks · ${qBids.length} bids)</summary>`;
+  qAsks.slice(0, 5).reverse().forEach(o => {
+    html += `<div class="order-row ask"><span>ASK</span><span>@ ${fmtPct(o.p)}</span><span>${o.s.toLocaleString()}</span></div>`;
+  });
+  qBids.slice(0, 5).forEach(o => {
+    html += `<div class="order-row bid"><span>BID</span><span>@ ${fmtPct(o.p)}</span><span>${o.s.toLocaleString()}</span></div>`;
+  });
+  html += `</details></div>`;
+
+  return html;
+}
+
+function copyPrice(btn, price) {
+  navigator.clipboard.writeText(price).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+async function analyzeMarket(market) {
+  let tokenIds = market.clobTokenIds || '[]';
+  if (typeof tokenIds === 'string') tokenIds = JSON.parse(tokenIds);
+  let outcomes = market.outcomes || '[]';
+  if (typeof outcomes === 'string') outcomes = JSON.parse(outcomes);
+  let outcomePrices = market.outcomePrices || '[]';
+  if (typeof outcomePrices === 'string') outcomePrices = JSON.parse(outcomePrices);
+
+  // Determine reward params
+  const rewardsMaxSpread = market.rewardsMaxSpread != null ? market.rewardsMaxSpread / 100 : 0.02;
+  const rewardsMinSize = market.rewardsMinSize || 0;
+  const hasRewards = rewardsMinSize > 0;
+
+  if (tokenIds.length === 0) return null;
+
+  // Fetch both books
+  const sides = [];
+  for (let i = 0; i < tokenIds.length; i++) {
+    try {
+      const book = await fetchBook(tokenIds[i]);
+      const analysis = analyzeBook(book, rewardsMinSize || 1);
+      sides.push({
+        name: outcomes[i] || `Outcome ${i + 1}`,
+        tokenId: tokenIds[i],
+        lastPrice: +outcomePrices[i] || null,
+        analysis
+      });
+    } catch (e) { /* skip */ }
+  }
+
+  if (sides.length === 0) return null;
+
+  // Sort: favored (higher last price) first
+  sides.sort((a, b) => (b.lastPrice || 0) - (a.lastPrice || 0));
+  sides[0].isFavored = true;
+
+  let html = `<div class="card market-card">
+    <div class="market-question">${market.question || market.groupItemTitle || 'Market'}</div>`;
+
+  if (!hasRewards) {
+    html += `<div class="hint" style="color:#64748b;">No active LP rewards on this market.</div>`;
+    html += `</div>`;
+    return html;
+  }
+
+  for (const side of sides) {
+    html += renderSide({
+      name: side.name,
+      isFavored: !!side.isFavored,
+      lastPrice: side.lastPrice,
+      tokenId: side.tokenId,
+      analysis: side.analysis,
+      rewardsMaxSpread,
+      rewardsMinSize,
+      hasRewards
+    });
+  }
+  html += `</div>`;
+  return html;
+}
+
+async function scan(isRefresh) {
+  const out = document.getElementById('output');
+  const raw = document.getElementById('input').value;
+  const parsed = parseInput(raw);
+
+  if (!parsed) {
+    out.innerHTML = '';
+    setStatus('Waiting for input...');
+    document.getElementById('refreshBtn').style.display = 'none';
+    return;
+  }
+
+  if (!isRefresh && raw === lastInput) return;
+  lastInput = raw;
+
+  setStatus(`<span class="spinner"></span>Scanning...`);
+  document.getElementById('status').innerHTML = `<span class="spinner"></span>Scanning...`;
+
+  try {
+    let html = '';
+    let marketsToScan = [];
+    let eventInfo = null;
+
+    if (parsed.type === 'token') {
+      // Single token mode — synthesize a fake market
+      const book = await fetchBook(parsed.value);
+      const analysis = analyzeBook(book, 1);
+      html += `<div class="card market-card">
+        <div class="market-question">Direct token scan</div>` +
+        renderSide({
+          name: 'Token',
+          isFavored: true,
+          lastPrice: null,
+          tokenId: parsed.value,
+          analysis,
+          rewardsMaxSpread: 0.02,
+          rewardsMinSize: 1,
+          hasRewards: true
+        }) + `</div>`;
+    } else {
+      const resolved = await resolveSlug(parsed.value);
+      if (resolved.kind === 'event') {
+        eventInfo = resolved.event;
+        marketsToScan = resolved.markets;
+      } else {
+        marketsToScan = resolved.markets;
+      }
+
+      // Filter to markets with active rewards first
+      const withRewards = marketsToScan.filter(m => (m.rewardsMinSize || 0) > 0 && !m.closed);
+      const withoutRewards = marketsToScan.filter(m => !((m.rewardsMinSize || 0) > 0 && !m.closed));
+
+      if (eventInfo) {
+        html += `<div class="event-banner">
+          <div class="event-title">${eventInfo.title || 'Event'}</div>
+          <div class="hint">${withRewards.length} farmable · ${withoutRewards.length} no rewards</div>
+        </div>`;
+      }
+
+      if (withRewards.length === 0) {
+        html += `<div class="card"><div class="hint" style="text-align:center;color:#94a3b8;font-size:13px;">
+          No farmable markets here. Either resolved, closed, or no LP rewards configured.
+        </div></div>`;
+      }
+
+      for (const m of withRewards) {
+        const card = await analyzeMarket(m);
+        if (card) html += card;
+      }
+
+      if (withoutRewards.length > 0 && withRewards.length > 0) {
+        html += `<details class="card"><summary>+ ${withoutRewards.length} markets without rewards</summary>`;
+        for (const m of withoutRewards) {
+          html += `<div class="hint" style="padding:4px 0;">· ${m.question || m.groupItemTitle}</div>`;
+        }
+        html += `</details>`;
+      }
+    }
+
+    out.innerHTML = html;
+    setStatus(`Updated ${new Date().toLocaleTimeString()}`);
+    document.getElementById('refreshBtn').style.display = 'block';
+  } catch (err) {
+    out.innerHTML = `<div class="error"><b>Scan failed:</b> ${err.message}</div>`;
+    setStatus('Failed');
+  }
+}
+
+// Auto-scan on input with debounce
+document.getElementById('input').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  setStatus('Typing...');
+  debounceTimer = setTimeout(() => scan(false), 800);
+});
+
+// Paste handler — scan faster on paste
+document.getElementById('input').addEventListener('paste', () => {
+  clearTimeout(debounceTimer);
+  setTimeout(() => scan(false), 100);
+});
+
+// Enter to scan immediately
+document.getElementById('input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') {
+    clearTimeout(debounceTimer);
+    scan(false);
+  }
+});
+</script>
+
+</body>
+</html>
